@@ -60,6 +60,7 @@ async def download_url(
 
     download_summary = DownloadSummary()
     hash_function = hash_function or (lambda data: sha256(data).hexdigest())
+    client_options = client_options or {}
     num_total_urls = len(urls)
 
     async def work() -> None:
