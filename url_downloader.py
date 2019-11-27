@@ -15,7 +15,7 @@ from datetime import datetime
 
 from aiohttp import ClientSession, ClientTimeout
 from terminal_utils.Progressor import Progressor
-from terminal_utils.ColoredOutput import ColoredOutput
+from terminal_utils.ColoredOutput import ColoredOutput, PrintColor
 
 
 LOG = getLogger(__name__)
@@ -238,10 +238,14 @@ class DownloadUrlProgressLogHandler(Handler):
 
     def emit(self, record: LogRecord):
         if record.levelno in {CRITICAL, ERROR}:
-            self._progressor.print_message(message=self._colored_output.print_red(message=record.msg))
+            self._progressor.print_message(
+                message=self._colored_output.make_color_output(print_color=PrintColor.RED, message=record.msg)
+            )
         elif record.levelno == WARNING:
             if not self.ignore_warnings:
-                self._progressor.print_message(message=self._colored_output.print_yellow(message=record.msg))
+                self._progressor.print_message(
+                    message=self._colored_output.make_color_output(print_color=PrintColor.YELLOW, message=record.msg)
+                )
         elif record.levelno == INFO:
             self._progressor.print_message(message=record.msg)
         elif record.levelno == DEBUG:
