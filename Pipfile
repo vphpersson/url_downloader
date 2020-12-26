@@ -5,9 +5,10 @@ name = "pypi"
 
 [packages]
 aiohttp = "*"
-terminal-utils = {git = "https://github.com/vphpersson/terminal_utils"}
+terminal-utils = {editable = true, git = "ssh://git@github.com/vphpersson/terminal_utils.git"}
+httpx = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.8"
+python_version = "3.9"
