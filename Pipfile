@@ -4,7 +4,6 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-aiohttp = "*"
 terminal-utils = {editable = true, git = "ssh://git@github.com/vphpersson/terminal_utils.git"}
 httpx = "*"
 
