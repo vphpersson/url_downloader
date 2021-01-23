@@ -6,6 +6,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'httpx',
-        'terminal_utils @ git+ssh://git@github.com/vphpersson/terminal_utils.git#egg=terminal_utils',
+        'pyutils @ git+ssh://git@github.com/vphpersson/pyutils.git#egg=pyutils',
+        'terminal_utils @ git+ssh://git@github.com/vphpersson/terminal_utils.git#egg=terminal_utils'
     ]
 )
