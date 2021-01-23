@@ -30,13 +30,14 @@ async def download_urls(
 
         def task_done_callback(finished_task: Task) -> None:
             request_limiting_semaphore.release()
-            response_callback(url, finished_task)
+            response_callback(finished_task.get_name(), finished_task)
             nonlocal num_completed
             num_completed += 1
             if num_completed == len(urls):
                 all_finished_lock.release()
 
         task = Task(http_client.get(url=url))
+        task.set_name(url)
         task.add_done_callback(task_done_callback)
 
     await all_finished_lock.acquire()
