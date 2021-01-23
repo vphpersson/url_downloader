@@ -1,8 +1,5 @@
-from asyncio import gather as asyncio_gather, Semaphore, Task, Lock
-from pathlib import Path, PurePath
-from typing import Optional, Callable, MutableSequence
-from hashlib import sha256
-from urllib.parse import urlparse
+from asyncio import Semaphore, Task, Lock
+from typing import Callable, Collection, Any
 from logging import getLogger
 from dataclasses import dataclass
 
@@ -42,37 +39,34 @@ class DownloadSummary:
 
 async def download_urls(
     http_client: AsyncClient,
-    urls: MutableSequence[str],
-    output_dir: Path,
-    num_concurrent: int = 10,
-    use_hashing: bool = False,
-    hash_function: Optional[Callable[[bytes], str]] = None,
+    urls: Collection[str],
+    response_callback: Callable[[Response], Any],
+    num_concurrent: int = 5,
+    raise_for_status: bool = True
 ) -> DownloadSummary:
     """
     Download resources given a list of URLs.
 
     :param http_client: An HTTP client with which to perform the downloads.
     :param urls: The URLs of the resources to download.
-    :param output_dir: The path of the directory in which the resource files shall be saved.
+    :param response_callback: A callback function that receives the response of an HTTP request for a resource.
     :param num_concurrent: The number of concurrent downloads.
-    :param use_hashing: Whether to use the hash a resource's contents as its filename.
-    :param hash_function: A callable that generates hashes. Is used only if `use_hashing` is `True`.
+    :param raise_for_status: Whether to raise an exception if the response status does not indicate success.
     :return: A summary of the status of the downloads.
     """
 
     download_summary = DownloadSummary()
-    hash_function = hash_function or (lambda data: sha256(data).hexdigest())
-    num_total_urls = len(urls)
 
-    semaphore = Semaphore(num_concurrent)
-    lock = Lock()
+    request_limiting_semaphore = Semaphore(num_concurrent)
+    all_finished_lock = Lock()
 
-    def handle_response(finished_task: Task):
-        LOG.debug(ProgressStatus(iteration=download_summary.num_completed, total=num_total_urls))
+    def handle_response(finished_task: Task) -> None:
+        LOG.debug(ProgressStatus(iteration=download_summary.num_completed, total=len(urls)))
 
         try:
             response: Response = finished_task.result()
-            response.raise_for_status()
+            if raise_for_status:
+                response.raise_for_status()
         except TimeoutException:
             LOG.warning(f'Timed out: {url}')
             download_summary.num_timeout += 1
@@ -86,34 +80,22 @@ async def download_urls(
             download_summary.num_unexpected_error += 1
             return
 
-        if use_hashing:
-            download_path: Path = output_dir / Path(hash_function(response.content))
-        else:
-            download_path: Path = output_dir / PurePath(urlparse(url=url).path).name
-
-        if download_path.exists():
-            LOG.warning(f'File already exists at download path: {download_path}')
-            download_summary.num_duplicates += 1
-        else:
-            download_path.write_bytes(response.content)
-
+        response_callback(response)
         download_summary.num_downloaded += 1
 
-    def callback(finished_task: Task):
-        semaphore.release()
+    def task_done_callback(finished_task: Task) -> None:
+        request_limiting_semaphore.release()
         handle_response(finished_task=finished_task)
-        if download_summary.num_completed == num_total_urls:
-            lock.release()
+        if download_summary.num_completed == len(urls):
+            all_finished_lock.release()
 
-    running_tasks: list[Task] = []
-    await lock.acquire()
+    await all_finished_lock.acquire()
     for url in urls:
-        await semaphore.acquire()
+        await request_limiting_semaphore.acquire()
 
         task = Task(http_client.get(url=url))
-        task.add_done_callback(callback)
-        running_tasks.append(task)
+        task.add_done_callback(task_done_callback)
 
-    await lock.acquire()
+    await all_finished_lock.acquire()
 
     return download_summary
