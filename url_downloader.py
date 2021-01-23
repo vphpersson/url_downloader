@@ -13,6 +13,7 @@ from httpx import AsyncClient
 from pyutils.argparse.typed_argument_parser import TypedArgumentParser
 from terminal_utils.progressor import Progressor
 from terminal_utils.log_handlers import ColoredProgressorLogHandler
+from pyutils.my_string import text_align_delimiter
 
 from url_downloader import download_urls, DownloadSummary, LOG
 
@@ -165,11 +166,11 @@ async def main():
                 LOG.addHandler(ColoredProgressorLogHandler(progressor=progressor, print_warnings=not args.ignore_warnings))
                 LOG.setLevel(level=DEBUG)
 
-            async with AsyncClient() as client:
+            async with AsyncClient(timeout=float(args.num_total_timeout_seconds)) as client:
                 start_time: datetime = datetime.now()
 
                 download_summary: DownloadSummary = await download_urls(
-                    client=client,
+                    http_client=client,
                     urls=list(args.all_urls),
                     output_dir=args.output_directory,
                     use_hashing=args.use_hashing,
@@ -184,9 +185,11 @@ async def main():
     else:
         if not args.quiet:
             print(
-                f'Elapsed time: {end_time - start_time}\n'
-                f'Num URLs: {num_urls}\n'
-                f'{download_summary}'
+                text_align_delimiter(
+                    f'Elapsed time: {end_time - start_time}\n'
+                    f'Num URLs: {num_urls}\n'
+                    f'{download_summary}'
+                )
             )
 
 if __name__ == '__main__':
