@@ -1,0 +1,3 @@
+httpx
+-e git+ssh://git@github.com/vphpersson/pyutils.git#egg=pyutils
+-e git+ssh://git@github.com/vphpersson/terminal_utils.git#egg=terminal_utils
