@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-from asyncio import run as asyncio_run
+from asyncio import run as asyncio_run, Task
+from dataclasses import dataclass
+from logging import getLogger
 from argparse import ArgumentParser, Action, Namespace, FileType, ArgumentTypeError
 from pathlib import Path, PurePath
 from typing import Optional, Iterable, Type
@@ -11,13 +13,42 @@ from datetime import datetime
 from urllib.parse import urlparse
 from hashlib import sha256
 
-from httpx import AsyncClient, Response
+from httpx import AsyncClient, Response, TimeoutException, HTTPStatusError
 from pyutils.argparse.typed_argument_parser import TypedArgumentParser
 from terminal_utils.progressor import Progressor
-from terminal_utils.log_handlers import ColoredProgressorLogHandler
+from terminal_utils.log_handlers import ColoredProgressorLogHandler, ProgressStatus
 from pyutils.my_string import text_align_delimiter
 
-from url_downloader import download_urls, DownloadSummary, LOG
+from url_downloader import download_urls
+
+LOG = getLogger(__name__)
+
+
+@dataclass
+class DownloadSummary:
+    num_downloaded: int = 0
+    num_duplicates: int = 0
+    num_timeout: int = 0
+    num_status_errors: int = 0
+    num_unexpected_error: int = 0
+
+    @property
+    def num_completed(self) -> int:
+        return sum((
+            self.num_downloaded,
+            self.num_timeout,
+            self.num_status_errors,
+            self.num_unexpected_error
+        ))
+
+    def __str__(self) -> str:
+        return (
+            f'Num downloads: {self.num_downloaded}\n'
+            f'Num duplicates: {self.num_duplicates}\n'
+            f'Num timeouts: {self.num_timeout}\n'
+            f'Num status errors: {self.num_status_errors}\n'
+            f'Num unknown errors: {self.num_unexpected_error}'
+        )
 
 
 class URLDownloaderArgumentParser(TypedArgumentParser):
@@ -166,7 +197,29 @@ async def main():
                 LOG.addHandler(ColoredProgressorLogHandler(progressor=progressor, print_warnings=not args.ignore_warnings))
                 LOG.setLevel(level=DEBUG)
 
-            def response_callback(response: Response) -> None:
+            download_summary = DownloadSummary()
+
+            def response_callback(url: str, response_task: Task) -> None:
+                LOG.debug(ProgressStatus(iteration=download_summary.num_completed, total=len(args.all_urls)))
+
+                try:
+                    response: Response = response_task.result()
+                    response.raise_for_status()
+                except TimeoutException:
+                    LOG.warning(f'Timed out: {url}')
+                    download_summary.num_timeout += 1
+                    return
+                except HTTPStatusError as e:
+                    LOG.warning(e.args[0].splitlines()[0])
+                    download_summary.num_status_errors += 1
+                    return
+                except:
+                    LOG.exception(f'Unexpected error: {url}')
+                    download_summary.num_unexpected_error += 1
+                    return
+
+                download_summary.num_downloaded += 1
+
                 if args.use_hashing:
                     download_path: Path = args.output_directory / Path(sha256(response.content).hexdigest())
                 else:
@@ -181,7 +234,7 @@ async def main():
             async with AsyncClient(timeout=float(args.num_total_timeout_seconds)) as client:
                 start_time: datetime = datetime.now()
 
-                download_summary: DownloadSummary = await download_urls(
+                await download_urls(
                     http_client=client,
                     urls=args.all_urls,
                     response_callback=response_callback,
