@@ -3,20 +3,33 @@
 from asyncio import run as asyncio_run
 from argparse import ArgumentParser, Action, Namespace, FileType, ArgumentTypeError
 from pathlib import Path
-from typing import Optional, Iterable
+from typing import Optional, Iterable, Type
 from io import TextIOWrapper
 from sys import stdin
 from logging import DEBUG
 from datetime import datetime
 
 from httpx import AsyncClient
+from pyutils.argparse.typed_argument_parser import TypedArgumentParser
 from terminal_utils.progressor import Progressor
 from terminal_utils.log_handlers import ColoredProgressorLogHandler
 
 from url_downloader import download_urls, DownloadSummary, LOG
 
 
-class URLDownloaderArgumentParser(ArgumentParser):
+class URLDownloaderArgumentParser(TypedArgumentParser):
+
+    class Namespace:
+        urls: list[str]
+        urls_files: list[str]
+        all_urls: set[str]
+        use_hashing: bool
+        num_concurrent: int
+        num_total_timeout_seconds: int
+        ignore_warnings: bool
+        quiet: bool
+        output_directory: Path
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -137,7 +150,7 @@ class URLDownloaderArgumentParser(ArgumentParser):
 
 
 async def main():
-    args = URLDownloaderArgumentParser().parse_args()
+    args: Type[URLDownloaderArgumentParser.Namespace] = URLDownloaderArgumentParser().parse_args()
 
     try:
         with Progressor() as progressor:
