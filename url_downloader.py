@@ -2,14 +2,16 @@
 
 from asyncio import run as asyncio_run
 from argparse import ArgumentParser, Action, Namespace, FileType, ArgumentTypeError
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Optional, Iterable, Type
 from io import TextIOWrapper
 from sys import stdin
 from logging import DEBUG
 from datetime import datetime
+from urllib.parse import urlparse
+from hashlib import sha256
 
-from httpx import AsyncClient
+from httpx import AsyncClient, Response
 from pyutils.argparse.typed_argument_parser import TypedArgumentParser
 from terminal_utils.progressor import Progressor
 from terminal_utils.log_handlers import ColoredProgressorLogHandler
@@ -158,23 +160,32 @@ async def main():
             if not args.urls and not args.urls_files:
                 args.all_urls = set(stdin.read().splitlines())
 
-            num_urls = len(args.all_urls)
-
             if args.quiet:
                 LOG.disabled = True
             else:
                 LOG.addHandler(ColoredProgressorLogHandler(progressor=progressor, print_warnings=not args.ignore_warnings))
                 LOG.setLevel(level=DEBUG)
 
+            def response_callback(response: Response) -> None:
+                if args.use_hashing:
+                    download_path: Path = args.output_directory / Path(sha256(response.content).hexdigest())
+                else:
+                    download_path: Path = args.output_directory / PurePath(urlparse(url=response.request.url).path).name
+
+                if download_path.exists():
+                    LOG.warning(f'File already exists at download path: {download_path}')
+                    download_summary.num_duplicates += 1
+                else:
+                    download_path.write_bytes(response.content)
+
             async with AsyncClient(timeout=float(args.num_total_timeout_seconds)) as client:
                 start_time: datetime = datetime.now()
 
                 download_summary: DownloadSummary = await download_urls(
                     http_client=client,
-                    urls=list(args.all_urls),
-                    output_dir=args.output_directory,
-                    use_hashing=args.use_hashing,
-                    num_concurrent=args.num_concurrent,
+                    urls=args.all_urls,
+                    response_callback=response_callback,
+                    num_concurrent=args.num_concurrent
                 )
 
                 end_time: datetime = datetime.now()
@@ -187,7 +198,7 @@ async def main():
             print(
                 text_align_delimiter(
                     f'Elapsed time: {end_time - start_time}\n'
-                    f'Num URLs: {num_urls}\n'
+                    f'Num URLs: {len(args.all_urls)}\n'
                     f'{download_summary}'
                 )
             )
