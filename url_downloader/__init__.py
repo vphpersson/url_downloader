@@ -20,6 +20,9 @@ async def download_urls(
     :return: A summary of the status of the downloads.
     """
 
+    if not urls:
+        return
+
     request_limiting_semaphore = Semaphore(num_concurrent)
     all_finished_lock = Lock()
     num_completed = 0
