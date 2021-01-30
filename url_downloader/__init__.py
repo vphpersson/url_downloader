@@ -27,19 +27,17 @@ async def download_urls(
     all_finished_lock = Lock()
     num_completed = 0
 
+    def task_done_callback(finished_task: Task) -> None:
+        request_limiting_semaphore.release()
+        response_callback(finished_task.get_name(), finished_task)
+        nonlocal num_completed
+        num_completed += 1
+        if num_completed == len(urls):
+            all_finished_lock.release()
+
     await all_finished_lock.acquire()
     for url in urls:
         await request_limiting_semaphore.acquire()
-
-        def task_done_callback(finished_task: Task) -> None:
-            request_limiting_semaphore.release()
-            response_callback(finished_task.get_name(), finished_task)
-            nonlocal num_completed
-            num_completed += 1
-            if num_completed == len(urls):
-                all_finished_lock.release()
-
-        task = Task(coro=http_client.get(url=url), name=url)
-        task.add_done_callback(task_done_callback)
+        Task(coro=http_client.get(url=url), name=url).add_done_callback(task_done_callback)
 
     await all_finished_lock.acquire()
