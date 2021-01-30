@@ -39,8 +39,7 @@ async def download_urls(
             if num_completed == len(urls):
                 all_finished_lock.release()
 
-        task = Task(http_client.get(url=url))
-        task.set_name(url)
+        task = Task(coro=http_client.get(url=url), name=url)
         task.add_done_callback(task_done_callback)
 
     await all_finished_lock.acquire()

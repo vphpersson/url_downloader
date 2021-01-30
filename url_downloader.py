@@ -131,7 +131,7 @@ class URLDownloaderArgumentParser(TypedArgumentParser):
             help='A path to a directory where downloaded resources are to be saved.',
             dest='output_directory',
             type=Path,
-            required=True
+            default=Path('.')
         )
 
     class ParseUrlsAction(Action):
@@ -223,7 +223,7 @@ async def main():
                 if args.use_hashing:
                     download_path: Path = args.output_directory / Path(sha256(response.content).hexdigest())
                 else:
-                    download_path: Path = args.output_directory / PurePath(urlparse(url=response.request.url).path).name
+                    download_path: Path = args.output_directory / PurePath(urlparse(url=url).path).name
 
                 if download_path.exists():
                     LOG.warning(f'File already exists at download path: {download_path}')
