@@ -18,8 +18,7 @@ from pyutils.argparse.typed_argument_parser import TypedArgumentParser
 from terminal_utils.progressor import Progressor
 from terminal_utils.log_handlers import ColoredProgressorLogHandler, ProgressStatus
 from pyutils.my_string import text_align_delimiter
-
-from url_downloader import download_urls
+from pyutils.asyncio import limited_gather
 
 LOG = getLogger(__name__)
 
@@ -199,7 +198,7 @@ async def main():
 
             download_summary = DownloadSummary()
 
-            def response_callback(url: str, response_task: Task) -> None:
+            def result_callback(response_task: Task, url: str) -> None:
                 LOG.debug(ProgressStatus(iteration=download_summary.num_completed, total=len(args.all_urls)))
 
                 try:
@@ -231,13 +230,13 @@ async def main():
                 else:
                     download_path.write_bytes(response.content)
 
-            async with AsyncClient(timeout=float(args.num_total_timeout_seconds)) as client:
+            async with AsyncClient(timeout=float(args.num_total_timeout_seconds)) as http_client:
                 start_time: datetime = datetime.now()
 
-                await download_urls(
-                    http_client=client,
-                    urls=args.all_urls,
-                    response_callback=response_callback,
+                await limited_gather(
+                    iteration_coroutine=http_client.get,
+                    iterable=args.all_urls,
+                    result_callback=result_callback,
                     num_concurrent=args.num_concurrent
                 )
 
