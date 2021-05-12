@@ -91,11 +91,11 @@ class URLDownloaderArgumentParser(TypedArgumentParser):
 
     class ParseUrlsAction(Action):
         def __call__(
-                self,
-                parser: ArgumentParser,
-                namespace: Namespace,
-                urls: Iterable[Path],
-                option_string: Optional[str] = None
+            self,
+            parser: ArgumentParser,
+            namespace: Namespace,
+            urls: Iterable[Path],
+            option_string: Optional[str] = None
         ) -> None:
 
             all_urls: set[str] = namespace.all_urls if hasattr(namespace, 'all_urls') else set()
@@ -106,11 +106,11 @@ class URLDownloaderArgumentParser(TypedArgumentParser):
 
     class ParseUrlsFilesAction(Action):
         def __call__(
-                self,
-                parser: ArgumentParser,
-                namespace: Namespace,
-                urls_files: Iterable[TextIOWrapper],
-                option_string: Optional[str] = None
+            self,
+            parser: ArgumentParser,
+            namespace: Namespace,
+            urls_files: Iterable[TextIOWrapper],
+            option_string: Optional[str] = None
         ) -> None:
 
             all_urls: set[str] = namespace.all_urls if hasattr(namespace, 'all_urls') else set()
@@ -126,11 +126,11 @@ class URLDownloaderArgumentParser(TypedArgumentParser):
 
     class ParseOutputDirectoryAction(Action):
         def __call__(
-                self,
-                parser: ArgumentParser,
-                namespace: Namespace,
-                output_directory: Path,
-                option_string: Optional[str] = None
+            self,
+            parser: ArgumentParser,
+            namespace: Namespace,
+            output_directory: Path,
+            option_string: Optional[str] = None
         ) -> None:
 
             if not output_directory.exists():
